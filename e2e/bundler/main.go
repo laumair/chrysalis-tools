@@ -21,20 +21,28 @@ import (
 	"github.com/iotaledger/iota.go/pow"
 	"github.com/iotaledger/iota.go/transaction"
 	"github.com/iotaledger/iota.go/trinary"
+	"github.com/wollac/iota-crypto-demo/pkg/bip32path"
+	"github.com/wollac/iota-crypto-demo/pkg/bip39"
+	"github.com/wollac/iota-crypto-demo/pkg/slip10"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 var (
-	nodeAPIURI               = flag.String("node", "https://api.coo.manapotion.io", "the API URI of the node")
+	nodeAPIURI               = flag.String("node", "https://nodes-legacy.ledgermigration1.net", "the API URI of the node")
 	originSeed               = flag.String("seed", strings.Repeat("9", consts.HashTrytesSize), "the seed to use to fund the created bundles")
 	infoFileName             = flag.String("info-file", "bundles.csv", "the file containing the different generated bundles")
-	manyAddrsCount           = flag.Int("manyAddrsCount", 100, "the addrs count to use for scenarios which involve many addresses")
-	manyAddrsSpace           = flag.Int("manyAddrsSpace", 200, "the index space to use for scenarios which involve many addresses")
-	manyAddrsSpentCount      = flag.Int("manyAddrsSpentCount", 10, "the addrs count to use for scenarios which involve many spent addresses")
-	manyAddrsSpentSpace      = flag.Int("manyAddrsSpentSpace", 30, "the index space to use for scenarios which involve many spent addresses")
-	manyAddrsSpentMixedCount = flag.Int("manyAddrsSpentMixedCount", 100, "the addrs count to use for scenarios which involve many unspent/spent addresses")
-	manyAddrsSpentMixedSpace = flag.Int("manyAddrsSpentMixedSpace", 200, "the index space to use for scenarios which involve many unspent/spent addresses")
+	manyAddrsCount           = flag.Int("manyAddrsCount", 15, "the addrs count to use for scenarios which involve many addresses")
+	manyAddrsSpace           = flag.Int("manyAddrsSpace", 15, "the index space to use for scenarios which involve many addresses")
+	manyAddrsSpentCount      = flag.Int("manyAddrsSpentCount", 15, "the addrs count to use for scenarios which involve many spent addresses")
+	manyAddrsSpentSpace      = flag.Int("manyAddrsSpentSpace", 15, "the index space to use for scenarios which involve many spent addresses")
+	manyAddrsSpentMixedCount = flag.Int("manyAddrsSpentMixedCount", 15, "the addrs count to use for scenarios which involve many unspent/spent addresses")
+	manyAddrsSpentMixedSpace = flag.Int("manyAddrsSpentMixedSpace", 15, "the index space to use for scenarios which involve many unspent/spent addresses")
 	mwm                      = flag.Int("mwm", 14, "the mwm to use for generated transactions/bundles")
 )
+
+const UPPER_INDEX = 3
+const PATH = "44'/4218'/508396330'/0'"
 
 func init() {
 	mathrand.Seed(time.Now().Unix())
@@ -82,19 +90,21 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 	must(err)
 	defer infoFile.Close()
 
-	scenario("Funds (>=1Mi) on a single unspent address (low index; < 30)",
-		"Test migration with a seed with all funds on a single unspent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (>=1Mi) on a single unspent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds on a single unspent address with index < %d.", UPPER_INDEX),
 		1_500_000, func() []AddrTuple {
-			targetSeed := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetSeed, targetMnemonic := randSeed()
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
-					Seed:  targetSeed,
-					Index: targetAddrIndex,
-					Addr:  mustAddrWithChecksum(targetSeed, targetAddrIndex),
-					Value: 1_500_000,
-					Spent: false,
+					Seed:     targetSeed,
+					Mnemonic: targetMnemonic,
+					Index:    targetAddrIndex,
+					Addr:     mustAddrWithChecksum(targetSeed, targetAddrIndex),
+					Value:    1_500_000,
+					Spent:    false,
 				},
 			}
 		}(), legacyAPI, []api.Input{
@@ -106,19 +116,21 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 			},
 		}, infoFile)
 
-	scenario("Funds (<1Mi) on a single unspent address (low index; < 30)",
-		"Test migration with a seed with all funds on a single unspent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (<1Mi) on a single unspent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds on a single unspent address with index < %d.", UPPER_INDEX),
 		500_000, func() []AddrTuple {
-			targetSeed := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetSeed, targetMnemonic := randSeed()
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
-					Seed:  targetSeed,
-					Index: targetAddrIndex,
-					Addr:  mustAddrWithChecksum(targetSeed, targetAddrIndex),
-					Value: 500_000,
-					Spent: false,
+					Seed:     targetSeed,
+					Mnemonic: targetMnemonic,
+					Index:    targetAddrIndex,
+					Addr:     mustAddrWithChecksum(targetSeed, targetAddrIndex),
+					Value:    500_000,
+					Spent:    false,
 				},
 			}
 		}(), legacyAPI, []api.Input{
@@ -131,18 +143,19 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 		}, infoFile)
 
 	scenario("Funds (>=1Mi) on a single unspent address (high index)",
-		"Test migration with a seed with all funds on a single unspent address with index > 30.",
+		fmt.Sprintf("Test migration with a seed with all funds on a single unspent address with index > %d.", UPPER_INDEX),
 		1_500_000, func() []AddrTuple {
-			targetSeed := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(50) + 31)
+			targetSeed, targetMnemonic := randSeed()
+			targetAddrIndex := uint64(mathrand.Int63n(10) + UPPER_INDEX + 1)
 
 			return []AddrTuple{
 				{
-					Seed:  targetSeed,
-					Index: targetAddrIndex,
-					Addr:  mustAddrWithChecksum(targetSeed, targetAddrIndex),
-					Value: 1_500_000,
-					Spent: false,
+					Seed:     targetSeed,
+					Mnemonic: targetMnemonic,
+					Index:    targetAddrIndex,
+					Addr:     mustAddrWithChecksum(targetSeed, targetAddrIndex),
+					Value:    1_500_000,
+					Spent:    false,
 				},
 			}
 		}(), legacyAPI, []api.Input{
@@ -209,19 +222,21 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 			},
 		}, infoFile)
 
-	scenario("Funds (>=1Mi) on a single spent address (low index; < 30)",
-		"Test migration with a seed with all funds >=1Mi on a single spent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (>=1Mi) on a single spent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds >=1Mi on a single spent address with index < %d.", UPPER_INDEX),
 		1_500_000, func() []AddrTuple {
-			targetSeed := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetSeed, targetMnemonic := randSeed()
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
-					Seed:  targetSeed,
-					Index: targetAddrIndex,
-					Addr:  mustAddrWithChecksum(targetSeed, targetAddrIndex),
-					Value: 1_500_000,
-					Spent: true,
+					Seed:     targetSeed,
+					Mnemonic: targetMnemonic,
+					Index:    targetAddrIndex,
+					Addr:     mustAddrWithChecksum(targetSeed, targetAddrIndex),
+					Value:    1_500_000,
+					Spent:    true,
 				},
 			}
 		}(), legacyAPI, []api.Input{
@@ -233,19 +248,21 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 			},
 		}, infoFile)
 
-	scenario("Funds (<1Mi) on a single spent address (low index; < 30)",
-		"Test migration with a seed with all funds on a single spent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (<1Mi) on a single spent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds on a single spent address with index < %d.", UPPER_INDEX),
 		500_000, func() []AddrTuple {
-			targetSeed := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetSeed, targetMnemonic := randSeed()
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
-					Seed:  targetSeed,
-					Index: targetAddrIndex,
-					Addr:  mustAddrWithChecksum(targetSeed, targetAddrIndex),
-					Value: 500_000,
-					Spent: true,
+					Seed:     targetSeed,
+					Mnemonic: targetMnemonic,
+					Index:    targetAddrIndex,
+					Addr:     mustAddrWithChecksum(targetSeed, targetAddrIndex),
+					Value:    500_000,
+					Spent:    true,
 				},
 			}
 		}(), legacyAPI, []api.Input{
@@ -381,7 +398,7 @@ func betweenMaxAOrB(funds uint64, addrCount int, a uint64, b uint64, chanceB flo
 }
 
 func fundsSpreadAcrossAddrSpace(addrCount int, addrSpace int, fundsOnAddr FundsOnAddr, chanceOfSpent float64) []AddrTuple {
-	targetSeed := randSeed()
+	targetSeed, targetMnemonic := randSeed()
 
 	targetAddrs := make([]AddrTuple, 0)
 	used := make(map[uint64]struct{})
@@ -401,11 +418,12 @@ func fundsSpreadAcrossAddrSpace(addrCount int, addrSpace int, fundsOnAddr FundsO
 		}
 
 		targetAddrs = append(targetAddrs, AddrTuple{
-			Seed:  targetSeed,
-			Index: addrIndex,
-			Addr:  mustAddrWithChecksum(targetSeed, addrIndex),
-			Value: fundsOnAddr(addrIndex),
-			Spent: spent,
+			Seed:     targetSeed,
+			Mnemonic: targetMnemonic,
+			Index:    addrIndex,
+			Addr:     mustAddrWithChecksum(targetSeed, addrIndex),
+			Value:    fundsOnAddr(addrIndex),
+			Spent:    spent,
 		})
 	}
 
@@ -446,7 +464,7 @@ func sendPrepBundle(legacyAPI *api.API, infoFile io.Writer, prepBundle []trinary
 }
 
 func makeAddrsSpent(legacyAPI *api.API, infoFile io.Writer, addrsTuple []AddrTuple) {
-	burnerSeed := randSeed()
+	burnerSeed, _ := randSeed()
 
 	var transfers, backTransfers = make(bundle.Transfers, 0), make(bundle.Transfers, 0)
 	var inputs, backInputs = make([]api.Input, 0), make([]api.Input, 0)
@@ -496,11 +514,12 @@ func makeAddrsSpent(legacyAPI *api.API, infoFile io.Writer, addrsTuple []AddrTup
 }
 
 type AddrTuple struct {
-	Seed  trinary.Trytes
-	Index uint64
-	Addr  trinary.Hash
-	Value uint64
-	Spent bool
+	Seed     trinary.Trytes
+	Mnemonic bip39.Mnemonic
+	Index    uint64
+	Addr     trinary.Hash
+	Value    uint64
+	Spent    bool
 }
 
 func mustAddrWithChecksum(seed string, index uint64) trinary.Trytes {
@@ -549,6 +568,9 @@ func scenario(name string, desc string, funds uint64, addrsTuple []AddrTuple, le
 		if addrTuple.Spent {
 			shouldAnyBeSpent = true
 		}
+
+		must(fmt.Fprintf(infoFile, "mnemonic: %s\n", addrTuple.Mnemonic))
+
 		if printSeedPerAddr {
 			must(fmt.Fprintf(infoFile, "seed %s\naddr index %d: %s, spent=%v, - %d\n", addrTuple.Seed, addrTuple.Index, addrTuple.Addr, addrTuple.Spent, addrTuple.Value))
 			continue
@@ -571,17 +593,71 @@ func scenario(name string, desc string, funds uint64, addrsTuple []AddrTuple, le
 	makeAddrsSpent(legacyAPI, infoFile, addrsTuple)
 }
 
-func randSeed() string {
-	b := make([]byte, consts.HashBytesSize)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
+func randSeed() (string, bip39.Mnemonic) {
+	var (
+		err      error
+		entropy  []byte
+		mnemonic bip39.Mnemonic
+	)
 
-	// convert to trytes and set the last trit to zero
-	seed, err := kerl.KerlBytesToTrytes(b)
+	entropy, err = generateEntropy(256 / 8)
+
 	if err != nil {
-		panic(err)
+		fmt.Errorf("failed generating entropy: %w", err)
 	}
 
-	return seed
+	mnemonic, _ = bip39.EntropyToMnemonic(entropy)
+
+	seed, _ := bip39.MnemonicToSeed(mnemonic, "")
+
+	path, err := bip32path.ParsePath(PATH)
+
+	curve := slip10.Secp256k1()
+	key, err := slip10.DeriveKeyFromPath(seed, curve, path)
+	if err != nil {
+		fmt.Errorf("failed deriving %s key: %w", curve.Name(), err)
+	}
+
+	return iotaSeedFromKey(key), mnemonic
+}
+
+func mnemonicToSeed(mnemonic bip39.Mnemonic) (trinary.Hash, error) {
+	seedBytes, err := bip39.MnemonicToEntropy(mnemonic)
+	if err != nil {
+		return "", err
+	}
+
+	trytes, err := kerl.KerlBytesToTrytes(seedBytes)
+
+	return trytes, err
+}
+
+func generateEntropy(size int) ([]byte, error) {
+	entropy := make([]byte, size)
+	if _, err := rand.Read(entropy); err != nil {
+		return nil, err
+	}
+	return entropy, nil
+}
+
+func parseMnemonic(s string) bip39.Mnemonic {
+	normalized := norm.NFKD.String(s)
+	return strings.Fields(normalized)
+}
+
+func iotaSeedFromKey(key *slip10.Key) trinary.Hash {
+	hash := kerl.NewKerl()
+
+	var entropy []byte
+	entropy = append(entropy, key.Key[0:32]...)
+	entropy = append(entropy, key.ChainCode[0:16]...)
+	entropy = append(entropy, key.Key[16:32]...)
+	entropy = append(entropy, key.ChainCode[0:32]...)
+
+	in, _ := kerl.KerlBytesToTrytes(entropy[:consts.HashBytesSize])
+	hash.MustAbsorbTrytes(in)
+	in, _ = kerl.KerlBytesToTrytes(entropy[consts.HashBytesSize:])
+	hash.MustAbsorbTrytes(in)
+
+	return hash.MustSqueezeTrytes(consts.HashTrinarySize)
 }
