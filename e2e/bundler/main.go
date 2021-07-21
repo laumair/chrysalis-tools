@@ -33,14 +33,15 @@ var (
 	originSeed               = flag.String("seed", strings.Repeat("9", consts.HashTrytesSize), "the seed to use to fund the created bundles")
 	infoFileName             = flag.String("info-file", "bundles.csv", "the file containing the different generated bundles")
 	manyAddrsCount           = flag.Int("manyAddrsCount", 15, "the addrs count to use for scenarios which involve many addresses")
-	manyAddrsSpace           = flag.Int("manyAddrsSpace", 25, "the index space to use for scenarios which involve many addresses")
-	manyAddrsSpentCount      = flag.Int("manyAddrsSpentCount", 10, "the addrs count to use for scenarios which involve many spent addresses")
-	manyAddrsSpentSpace      = flag.Int("manyAddrsSpentSpace", 25, "the index space to use for scenarios which involve many spent addresses")
+	manyAddrsSpace           = flag.Int("manyAddrsSpace", 15, "the index space to use for scenarios which involve many addresses")
+	manyAddrsSpentCount      = flag.Int("manyAddrsSpentCount", 15, "the addrs count to use for scenarios which involve many spent addresses")
+	manyAddrsSpentSpace      = flag.Int("manyAddrsSpentSpace", 15, "the index space to use for scenarios which involve many spent addresses")
 	manyAddrsSpentMixedCount = flag.Int("manyAddrsSpentMixedCount", 15, "the addrs count to use for scenarios which involve many unspent/spent addresses")
-	manyAddrsSpentMixedSpace = flag.Int("manyAddrsSpentMixedSpace", 25, "the index space to use for scenarios which involve many unspent/spent addresses")
+	manyAddrsSpentMixedSpace = flag.Int("manyAddrsSpentMixedSpace", 15, "the index space to use for scenarios which involve many unspent/spent addresses")
 	mwm                      = flag.Int("mwm", 14, "the mwm to use for generated transactions/bundles")
 )
 
+const UPPER_INDEX = 3
 const PATH = "44'/4218'/508396330'/0'"
 
 func init() {
@@ -89,11 +90,12 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 	must(err)
 	defer infoFile.Close()
 
-	scenario("Funds (>=1Mi) on a single unspent address (low index; < 30)",
-		"Test migration with a seed with all funds on a single unspent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (>=1Mi) on a single unspent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds on a single unspent address with index < %d.", UPPER_INDEX),
 		1_500_000, func() []AddrTuple {
 			targetSeed, targetMnemonic := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
@@ -114,11 +116,12 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 			},
 		}, infoFile)
 
-	scenario("Funds (<1Mi) on a single unspent address (low index; < 30)",
-		"Test migration with a seed with all funds on a single unspent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (<1Mi) on a single unspent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds on a single unspent address with index < %d.", UPPER_INDEX),
 		500_000, func() []AddrTuple {
 			targetSeed, targetMnemonic := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
@@ -140,10 +143,10 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 		}, infoFile)
 
 	scenario("Funds (>=1Mi) on a single unspent address (high index)",
-		"Test migration with a seed with all funds on a single unspent address with index > 30.",
+		fmt.Sprintf("Test migration with a seed with all funds on a single unspent address with index > %d.", UPPER_INDEX),
 		1_500_000, func() []AddrTuple {
 			targetSeed, targetMnemonic := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(50) + 31)
+			targetAddrIndex := uint64(mathrand.Int63n(10) + UPPER_INDEX + 1)
 
 			return []AddrTuple{
 				{
@@ -219,11 +222,12 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 			},
 		}, infoFile)
 
-	scenario("Funds (>=1Mi) on a single spent address (low index; < 30)",
-		"Test migration with a seed with all funds >=1Mi on a single spent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (>=1Mi) on a single spent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds >=1Mi on a single spent address with index < %d.", UPPER_INDEX),
 		1_500_000, func() []AddrTuple {
 			targetSeed, targetMnemonic := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
@@ -244,11 +248,12 @@ func generateBundles(legacyAPI *api.API, originAddr trinary.Trytes) {
 			},
 		}, infoFile)
 
-	scenario("Funds (<1Mi) on a single spent address (low index; < 30)",
-		"Test migration with a seed with all funds on a single spent address with index < 30.",
+	scenario(
+		fmt.Sprintf("Funds (<1Mi) on a single spent address (low index; < %d)", UPPER_INDEX),
+		fmt.Sprintf("Test migration with a seed with all funds on a single spent address with index < %d.", UPPER_INDEX),
 		500_000, func() []AddrTuple {
 			targetSeed, targetMnemonic := randSeed()
-			targetAddrIndex := uint64(mathrand.Int63n(30))
+			targetAddrIndex := uint64(mathrand.Int63n(UPPER_INDEX))
 
 			return []AddrTuple{
 				{
