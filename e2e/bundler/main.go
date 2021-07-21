@@ -42,7 +42,13 @@ var (
 )
 
 const UPPER_INDEX = 3
-const PATH = "44'/4218'/508396330'/0'"
+const ACCOUNT_INDEX = 508396330
+
+var seeds_count = 0
+
+const BIP_BASE_PATH = "44'/4218'/%d'/0'"
+
+var MNEMONIC bip39.Mnemonic
 
 func init() {
 	mathrand.Seed(time.Now().Unix())
@@ -570,6 +576,8 @@ func scenario(name string, desc string, funds uint64, addrsTuple []AddrTuple, le
 		}
 
 		must(fmt.Fprintf(infoFile, "mnemonic: %s\n", addrTuple.Mnemonic))
+		must(fmt.Fprintf(infoFile, "BIP path: %s\n", fmt.Sprintf(BIP_BASE_PATH, ACCOUNT_INDEX+seeds_count-1)))
+		must(fmt.Fprintf(infoFile, "Account Index: %d\n", seeds_count-1))
 
 		if printSeedPerAddr {
 			must(fmt.Fprintf(infoFile, "seed %s\naddr index %d: %s, spent=%v, - %d\n", addrTuple.Seed, addrTuple.Index, addrTuple.Addr, addrTuple.Spent, addrTuple.Value))
@@ -595,22 +603,26 @@ func scenario(name string, desc string, funds uint64, addrsTuple []AddrTuple, le
 
 func randSeed() (string, bip39.Mnemonic) {
 	var (
-		err      error
-		entropy  []byte
-		mnemonic bip39.Mnemonic
+		err     error
+		entropy []byte
 	)
-
-	entropy, err = generateEntropy(256 / 8)
 
 	if err != nil {
 		fmt.Errorf("failed generating entropy: %w", err)
 	}
 
-	mnemonic, _ = bip39.EntropyToMnemonic(entropy)
+	if MNEMONIC == nil {
+		entropy, err = generateEntropy(256 / 8)
 
-	seed, _ := bip39.MnemonicToSeed(mnemonic, "")
+		MNEMONIC, _ = bip39.EntropyToMnemonic(entropy)
+	}
 
-	path, err := bip32path.ParsePath(PATH)
+	seed, _ := bip39.MnemonicToSeed(MNEMONIC, "")
+
+	var bip_path = fmt.Sprintf(BIP_BASE_PATH, ACCOUNT_INDEX+seeds_count)
+	log.Printf("BIP Path %s", bip_path)
+
+	path, err := bip32path.ParsePath(bip_path)
 
 	curve := slip10.Secp256k1()
 	key, err := slip10.DeriveKeyFromPath(seed, curve, path)
@@ -618,7 +630,9 @@ func randSeed() (string, bip39.Mnemonic) {
 		fmt.Errorf("failed deriving %s key: %w", curve.Name(), err)
 	}
 
-	return iotaSeedFromKey(key), mnemonic
+	seeds_count++
+
+	return iotaSeedFromKey(key), MNEMONIC
 }
 
 func mnemonicToSeed(mnemonic bip39.Mnemonic) (trinary.Hash, error) {
