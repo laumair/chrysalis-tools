@@ -561,6 +561,11 @@ func scenario(name string, desc string, funds uint64, addrsTuple []AddrTuple, le
 	must(fmt.Fprintf(infoFile, "scenario: %s\n", name))
 	must(fmt.Fprintf(infoFile, "description: %s\n", desc))
 	must(fmt.Fprintf(infoFile, "account balance: %d\n", funds))
+
+	must(fmt.Fprintf(infoFile, "mnemonic: %s\n", addrsTuple[0].Mnemonic))
+	must(fmt.Fprintf(infoFile, "BIP path: %s\n", fmt.Sprintf(BIP_BASE_PATH, ACCOUNT_INDEX+seeds_count-1)))
+	must(fmt.Fprintf(infoFile, "Account Index: %d\n", seeds_count-1))
+
 	defer func() {
 		log.Printf("done generating scenario, took %v\n", time.Since(s))
 		must(fmt.Fprintf(infoFile, "took %v\n", time.Since(s)))
@@ -576,10 +581,6 @@ func scenario(name string, desc string, funds uint64, addrsTuple []AddrTuple, le
 		if addrTuple.Spent {
 			shouldAnyBeSpent = true
 		}
-
-		must(fmt.Fprintf(infoFile, "mnemonic: %s\n", addrTuple.Mnemonic))
-		must(fmt.Fprintf(infoFile, "BIP path: %s\n", fmt.Sprintf(BIP_BASE_PATH, ACCOUNT_INDEX+seeds_count-1)))
-		must(fmt.Fprintf(infoFile, "Account Index: %d\n", seeds_count-1))
 
 		if printSeedPerAddr {
 			must(fmt.Fprintf(infoFile, "seed %s\naddr index %d: %s, spent=%v, - %d\n", addrTuple.Seed, addrTuple.Index, addrTuple.Addr, addrTuple.Spent, addrTuple.Value))
