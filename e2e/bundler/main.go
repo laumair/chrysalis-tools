@@ -18,6 +18,8 @@ import (
 	"github.com/iotaledger/iota.go/bundle"
 	"github.com/iotaledger/iota.go/consts"
 	"github.com/iotaledger/iota.go/kerl"
+	"github.com/iotaledger/iota.go/kerl/sha3"
+
 	"github.com/iotaledger/iota.go/pow"
 	"github.com/iotaledger/iota.go/transaction"
 	"github.com/iotaledger/iota.go/trinary"
@@ -660,18 +662,16 @@ func parseMnemonic(s string) bip39.Mnemonic {
 }
 
 func iotaSeedFromKey(key *slip10.Key) trinary.Hash {
-	hash := kerl.NewKerl()
+	hash := sha3.NewLegacyKeccak384()
 
-	var entropy []byte
-	entropy = append(entropy, key.Key[0:32]...)
-	entropy = append(entropy, key.ChainCode[0:16]...)
-	entropy = append(entropy, key.Key[16:32]...)
-	entropy = append(entropy, key.ChainCode[0:32]...)
+	hash.Write(key.Key[0:32])
+	hash.Write(key.ChainCode[0:16])
+	hash.Write(key.Key[16:32])
+	hash.Write(key.ChainCode[0:32])
 
-	in, _ := kerl.KerlBytesToTrytes(entropy[:consts.HashBytesSize])
-	hash.MustAbsorbTrytes(in)
-	in, _ = kerl.KerlBytesToTrytes(entropy[consts.HashBytesSize:])
-	hash.MustAbsorbTrytes(in)
-
-	return hash.MustSqueezeTrytes(consts.HashTrinarySize)
+	seed, err := kerl.KerlBytesToTrytes(hash.Sum(nil))
+	if err != nil {
+		panic(err)
+	}
+	return seed
 }
