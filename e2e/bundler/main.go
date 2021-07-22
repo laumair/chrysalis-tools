@@ -472,7 +472,7 @@ func sendPrepBundle(legacyAPI *api.API, infoFile io.Writer, prepBundle []trinary
 }
 
 func makeAddrsSpent(legacyAPI *api.API, infoFile io.Writer, addrsTuple []AddrTuple) {
-	burnerSeed, _ := randSeed()
+	burnerSeed, _ := randBurnerSeed()
 
 	var transfers, backTransfers = make(bundle.Transfers, 0), make(bundle.Transfers, 0)
 	var inputs, backInputs = make([]api.Input, 0), make([]api.Input, 0)
@@ -602,6 +602,37 @@ func scenario(name string, desc string, funds uint64, addrsTuple []AddrTuple, le
 	log.Printf("waiting for scenario bundle to be confirmed before sending forth/back to spent addrs... (tail %s)", tailTx.Hash)
 	waitUntilConfirmed(legacyAPI, tailTx)
 	makeAddrsSpent(legacyAPI, infoFile, addrsTuple)
+}
+
+func randBurnerSeed() (string, bip39.Mnemonic) {
+	var (
+		err      error
+		entropy  []byte
+		mnemonic bip39.Mnemonic
+	)
+
+	if err != nil {
+		fmt.Errorf("failed generating entropy: %w", err)
+	}
+
+	entropy, err = generateEntropy(256 / 8)
+
+	mnemonic, _ = bip39.EntropyToMnemonic(entropy)
+
+	seed, _ := bip39.MnemonicToSeed(mnemonic, "")
+
+	var bip_path = fmt.Sprintf(BIP_BASE_PATH, ACCOUNT_INDEX)
+	log.Printf("BIP Path %s", bip_path)
+
+	path, err := bip32path.ParsePath(bip_path)
+
+	curve := slip10.Secp256k1()
+	key, err := slip10.DeriveKeyFromPath(seed, curve, path)
+	if err != nil {
+		fmt.Errorf("failed deriving %s key: %w", curve.Name(), err)
+	}
+
+	return iotaSeedFromKey(key), mnemonic
 }
 
 func randSeed() (string, bip39.Mnemonic) {
